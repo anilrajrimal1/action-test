@@ -1,17 +1,16 @@
-name: Build Starterkit Frontend CICD
+name: Action Test Deployment
 
 on:
   push:
     branches:
-      - develop
-      - staging
       - master
   workflow_dispatch:
 
 env:
   AUTHOR: naxa
   AWS_REGION: ap-south-1
-  PROJECT_NAME: react-typescript-starterkit-v3
+  PROJECT_NAME: gh-action-test
+  S3_BUCKET_NAME: naxa-ci-artifacts
 
 jobs:
   build:
@@ -40,22 +39,6 @@ jobs:
         id: write_env
         run: |
           case "${{ github.ref }}" in
-          refs/heads/develop)
-          echo '
-          # Write Development Environments
-          SITE_NAME="Starter Kit -v3 (Ts)"
-          BASE_URL=https://admin.naxa.com.np
-          API_URL_V1=https://admin.naxa.com.np/api/v1
-          ' > .env
-          ;;
-          refs/heads/staging)
-          echo '
-          # Write Staging Environments
-          SITE_NAME="Starter Kit -v3 (Ts)"
-          BASE_URL=https://admin.naxa.com.np
-          API_URL_V1=https://admin.naxa.com.np/api/v1
-          ' > .env
-          ;;
           refs/heads/master)
           echo '
           # Write Production Environments
@@ -76,62 +59,44 @@ jobs:
         run: |
           yarn build
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Upload Build Artifact to S3
+        uses: anilrajrimal1/s3-build-artifact-uploader@v1.0.3
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-  
-      - name: Upload Dist as Artifacts
-        run: |
-          export ZIP_NAME=${{ env.PROJECT_NAME }}-${{ github.run_id }}-${{ github.run_number }}.zip
-          export S3_BUILD_PATH=s3://naxa-ci-artifacts/${{ env.PROJECT_NAME }}-${{ github.run_id }}/$ZIP_NAME
-          zip -r $ZIP_NAME ./dist
-          aws s3 cp $ZIP_NAME $S3_BUILD_PATH
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: ${{ env.AWS_REGION }}
+          s3_bucket_name: ${{ env.S3_BUCKET_NAME }}
+          project_name: ${{ env.PROJECT_NAME }}
+          zip_name: ${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_number }}.zip
 
   deploy:
     name: Deploy Static Files
     needs:
       - build
-    if: ${{ github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/master'  }}
     runs-on: self-hosted
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Download Build Artifact from S3
+        uses: anilrajrimal1/s3-build-artifact-downloader@v1.0.2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Get Artifacts from Build Step
-        run: |
-          export ZIP_NAME=${{ env.PROJECT_NAME }}-${{ github.run_id }}-${{ github.run_number }}.zip
-          export S3_BUILD_PATH=s3://naxa-ci-artifacts/${{ env.PROJECT_NAME }}-${{ github.run_id }}/$ZIP_NAME
-          aws s3 cp $S3_BUILD_PATH $ZIP_NAME
-          unzip $ZIP_NAME
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: ${{ env.AWS_REGION }}
+          s3_bucket_name: ${{ env.S3_BUCKET_NAME }}
+          project_name: ${{ env.PROJECT_NAME }}
+          zip_name: ${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_number }}.zip
 
       - name: Get VM SSH host and user
         id: get_vm_conf
         run: |
           case "${{ github.ref }}" in
           refs/heads/develop)
-              export SERVER_IP=159.89.164.123
-              export SERVER_USERNAME=devops
-              export PROJECT_PATH=/srv/Projects/react-typescript-starterkit-v3/dist
-              ;;      
-              refs/heads/staging)
-              export SERVER_IP=159.89.164.123
-              export SERVER_USERNAME=devops
-              export PROJECT_PATH=/srv/Projects/react-typescript-starterkit-v3/dist
-              ;;
               refs/heads/master)
               export SERVER_IP=159.89.164.123
               export SERVER_USERNAME=devops
-              export PROJECT_PATH=/srv/Projects/react-typescript-starterkit-v3/dist   
+              export PROJECT_PATH=/srv/Projects/gh-actions-test/dist
           esac
           echo "SERVER_IP=${SERVER_IP}" >> $GITHUB_OUTPUT
           echo "SERVER_USERNAME=${SERVER_USERNAME}" >> $GITHUB_OUTPUT
