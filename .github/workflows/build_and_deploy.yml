@@ -92,8 +92,7 @@ jobs:
         id: get_vm_conf
         run: |
           case "${{ github.ref }}" in
-          refs/heads/develop)
-              refs/heads/master)
+          refs/heads/master)
               export SERVER_IP=159.89.164.123
               export SERVER_USERNAME=devops
               export PROJECT_PATH=/srv/Projects/gh-actions-test/dist
