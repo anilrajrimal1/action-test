@@ -60,7 +60,7 @@ jobs:
           yarn build
 
       - name: Upload Build Artifact to S3
-        uses: anilrajrimal1/s3-build-artifact-uploader@v2.0.2
+        uses: anilrajrimal1/s3-build-artifact-uploader@v2.0.3
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
